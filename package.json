@@ -13,6 +13,7 @@
     "@tailwindcss/vite": "^4.1.4",
     "preact": "^10.26.4",
     "react-aria-components": "^1.8.0",
+    "socket.io-client": "^4.8.1",
     "tailwindcss": "^4.1.4",
     "tailwindcss-react-aria-components": "^2.0.0"
   },

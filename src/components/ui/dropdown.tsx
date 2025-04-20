@@ -1,10 +1,10 @@
-import { IconCheck } from "@intentui/icons"
+import { IconCheck } from "@intentui/icons";
 import type {
   ListBoxItemProps,
   SectionProps,
   SeparatorProps,
   TextProps,
-} from "react-aria-components"
+} from "react-aria-components";
 import {
   Collection,
   Header,
@@ -13,10 +13,18 @@ import {
   Separator,
   Text,
   composeRenderProps,
-} from "react-aria-components"
-import { twMerge } from "tailwind-merge"
-import { tv } from "tailwind-variants"
-import { Keyboard } from "./keyboard"
+} from "react-aria-components";
+import { twMerge } from "tailwind-merge";
+import { tv } from "tailwind-variants";
+import { Keyboard } from "./keyboard";
+
+// Extend TextProps for Preact compatibility
+interface ExtendedTextProps extends TextProps {
+  children?: preact.ComponentChildren;
+  className?: string;
+  slot?: string;
+  title?: string;
+}
 
 const dropdownItemStyles = tv({
   base: [
@@ -45,60 +53,74 @@ const dropdownItemStyles = tv({
       ],
     },
   },
-})
+});
 
 const dropdownSectionStyles = tv({
   slots: {
     section: "col-span-full grid grid-cols-[auto_1fr]",
-    header: "col-span-full px-2.5 py-1 font-medium text-muted-fg text-sm sm:text-xs",
+    header:
+      "col-span-full px-2.5 py-1 font-medium text-muted-fg text-sm sm:text-xs",
   },
-})
+});
 
-const { section, header } = dropdownSectionStyles()
+const { section, header } = dropdownSectionStyles();
 
 interface DropdownSectionProps<T> extends SectionProps<T> {
-  title?: string
+  title?: string;
 }
 
-const DropdownSection = <T extends object>({ className, ...props }: DropdownSectionProps<T>) => {
+const DropdownSection = <T extends object>({
+  className,
+  ...props
+}: DropdownSectionProps<T>) => {
   return (
     <ListBoxSection className={section({ className })}>
       {"title" in props && <Header className={header()}>{props.title}</Header>}
       <Collection items={props.items}>{props.children}</Collection>
     </ListBoxSection>
-  )
-}
+  );
+};
 
-type DropdownItemProps = ListBoxItemProps
+type DropdownItemProps = ListBoxItemProps;
 
 const DropdownItem = ({ className, ...props }: DropdownItemProps) => {
   const textValue =
-    props.textValue || (typeof props.children === "string" ? props.children : undefined)
+    props.textValue ||
+    (typeof props.children === "string" ? props.children : undefined);
   return (
     <ListBoxItemPrimitive
       textValue={textValue}
       className={composeRenderProps(className, (className, renderProps) =>
-        dropdownItemStyles({ ...renderProps, className }),
+        dropdownItemStyles({ ...renderProps, className })
       )}
       {...props}
     >
-      {composeRenderProps(props.children, (children, { isSelected }) => (
-        <>
-          {isSelected && <IconCheck className="-mx-0.5 mr-2" data-slot="checked-icon" />}
-          {typeof children === "string" ? <DropdownLabel>{children}</DropdownLabel> : children}
-        </>
-      ))}
+      {composeRenderProps(
+        props.children,
+        (children, renderProps: { isSelected: boolean }) => (
+          <>
+            {renderProps.isSelected && (
+              <IconCheck className="-mx-0.5 mr-2" data-slot="checked-icon" />
+            )}
+            {typeof children === "string" ? (
+              <DropdownLabel>{children}</DropdownLabel>
+            ) : (
+              children
+            )}
+          </>
+        )
+      )}
     </ListBoxItemPrimitive>
-  )
-}
+  );
+};
 
-interface DropdownItemDetailProps extends TextProps {
-  label?: TextProps["children"]
-  description?: TextProps["children"]
+interface DropdownItemDetailProps extends ExtendedTextProps {
+  label?: preact.ComponentChildren;
+  description?: preact.ComponentChildren;
   classNames?: {
-    label?: TextProps["className"]
-    description?: TextProps["className"]
-  }
+    label?: string;
+    description?: string;
+  };
 }
 
 const DropdownItemDetails = ({
@@ -107,7 +129,7 @@ const DropdownItemDetails = ({
   classNames,
   ...props
 }: DropdownItemDetailProps) => {
-  const { slot, children, title, ...restProps } = props
+  const { slot, children, title, ...restProps } = props;
 
   return (
     <div
@@ -135,16 +157,23 @@ const DropdownItemDetails = ({
       )}
       {!title && children}
     </div>
-  )
-}
+  );
+};
 
 interface DropdownLabelProps extends TextProps {
-  ref?: React.Ref<HTMLDivElement>
+  ref?: React.Ref<HTMLDivElement>;
+  className?: string;
+  children?: string | preact.ComponentChildren;
 }
 
 const DropdownLabel = ({ className, ref, ...props }: DropdownLabelProps) => (
-  <Text slot="label" ref={ref} className={twMerge("col-start-2", className)} {...props} />
-)
+  <Text
+    slot="label"
+    ref={ref}
+    className={twMerge("col-start-2", className)}
+    {...props}
+  />
+);
 
 const DropdownSeparator = ({ className, ...props }: SeparatorProps) => (
   <Separator
@@ -152,27 +181,35 @@ const DropdownSeparator = ({ className, ...props }: SeparatorProps) => (
     className={twMerge("-mx-1 col-span-full my-1 h-px bg-border", className)}
     {...props}
   />
-)
+);
 
-const DropdownKeyboard = ({ className, ...props }: React.ComponentProps<typeof Keyboard>) => {
+const DropdownKeyboard = ({
+  className,
+  ...props
+}: React.ComponentProps<typeof Keyboard> & { className?: string }) => {
   return (
     <Keyboard
       classNames={{
         base: twMerge(
           "absolute right-2 group-hover:text-primary-fg group-focus:text-primary-fg pl-2",
-          className,
+          className
         ),
       }}
       {...props}
     />
-  )
-}
+  );
+};
 
 /**
  * Note: This is not exposed component, but it's used in other components to render dropdowns.
  * @internal
  */
-export type { DropdownSectionProps, DropdownLabelProps, DropdownItemProps, DropdownItemDetailProps }
+export type {
+  DropdownSectionProps,
+  DropdownLabelProps,
+  DropdownItemProps,
+  DropdownItemDetailProps,
+};
 export {
   DropdownSeparator,
   DropdownItem,
@@ -182,4 +219,4 @@ export {
   DropdownItemDetails,
   DropdownSection,
   dropdownSectionStyles,
-}
+};
