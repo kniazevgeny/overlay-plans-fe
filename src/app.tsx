@@ -4,7 +4,6 @@ import "./app.css";
 import { WebSocketService } from "./utils/websocket-service";
 import { DateRange } from "./utils/date-range";
 import { CustomRangeCalendar } from "./components/calendar";
-import { Button } from "./components/ui/button";
 import {
   ConnectionPanel,
   UserInfoPanel,
@@ -12,6 +11,7 @@ import {
   UpdateDeleteTimeslotPanel,
   EventLogPanel,
 } from "./components/websocket-components";
+import { RangeCalendarExample } from "./components/range-calendar-example";
 
 export function App() {
   // State management
@@ -30,6 +30,7 @@ export function App() {
   const [status, setStatus] = useState("available");
   const [label, setLabel] = useState("");
   const [color, setColor] = useState("#4CAF50");
+  const [showDraggableEvents, setShowDraggableEvents] = useState(false);
 
   const eventLogRef = useRef<HTMLDivElement>(null);
 
@@ -148,80 +149,82 @@ export function App() {
   };
 
   return (
-    <div className="app bg-background text-foreground p-4 max-w-6xl mx-auto">
+    <div className="app bg-background text-foreground p-4 max-w-10xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Timeslot WebSocket Client</h1>
-      <div className="mb-4 flex items-center gap-2">
-        Connection Status:
-        <span
-          className={`px-2 py-0.5 rounded-md text-sm font-medium ${
-            connected
-              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
-              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
-          }`}
-        >
-          {connected ? "Connected" : "Disconnected"}
-        </span>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <ConnectionPanel
-          serverUrl={serverUrl}
-          setServerUrl={setServerUrl}
-          connected={connected}
-          handleConnect={handleConnect}
-          handleDisconnect={handleDisconnect}
-        />
-
-        <UserInfoPanel
-          userId={userId}
-          setUserId={setUserId}
-          projectId={projectId}
-          setProjectId={setProjectId}
-          connected={connected}
-          handleGetTimeslots={handleGetTimeslots}
-        />
-      </div>
-
-      <div className="bg-card text-card-foreground rounded-lg shadow-sm p-4 mb-4">
-        <h2 className="text-xl font-semibold mb-3">Select Date Range</h2>
-        <CustomRangeCalendar
-          selectedDateRange={selectedDateRange}
-          setSelectedDateRange={setSelectedDateRange}
-        />
-        <div className="mt-4">
-          <p className="text-muted-foreground">
-            Selected Range:
-            {selectedDateRange ? selectedDateRange.toString() : " None"}
-          </p>
+      <div className="mb-4">
+        <div className="mb-4 flex items-center gap-2">
+          Connection Status:
+          <span
+            className={`px-2 py-0.5 rounded-md text-sm font-medium ${
+              connected
+                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
+            }`}
+          >
+            {connected ? "Connected" : "Disconnected"}
+          </span>
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <ConnectionPanel
+            serverUrl={serverUrl}
+            setServerUrl={setServerUrl}
+            connected={connected}
+            handleConnect={handleConnect}
+            handleDisconnect={handleDisconnect}
+          />
+
+          <UserInfoPanel
+            userId={userId}
+            setUserId={setUserId}
+            projectId={projectId}
+            setProjectId={setProjectId}
+            connected={connected}
+            handleGetTimeslots={handleGetTimeslots}
+          />
+        </div>
+
+        <div className="bg-card text-card-foreground rounded-lg shadow-sm p-4 mb-4">
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-xl font-semibold">Select Date Range</h2>
+          </div>
+
+          <RangeCalendarExample
+            webSocketService={webSocketService}
+            connected={connected}
+            userId={userId}
+            projectId={projectId}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <AddTimeslotPanel
+            notes={notes}
+            setNotes={setNotes}
+            status={status}
+            setStatus={setStatus}
+            label={label}
+            setLabel={setLabel}
+            color={color}
+            setColor={setColor}
+            connected={connected}
+            selectedDateRange={selectedDateRange}
+            handleAddTimeslot={handleAddTimeslot}
+          />
+
+          <UpdateDeleteTimeslotPanel
+            timeslotId={timeslotId}
+            setTimeslotId={setTimeslotId}
+            connected={connected}
+            selectedDateRange={selectedDateRange}
+            handleUpdateTimeslot={handleUpdateTimeslot}
+            handleDeleteTimeslot={handleDeleteTimeslot}
+          />
+        </div>
+
+        <EventLogPanel eventLog={eventLog} eventLogRef={setEventLogRef} />
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <AddTimeslotPanel
-          notes={notes}
-          setNotes={setNotes}
-          status={status}
-          setStatus={setStatus}
-          label={label}
-          setLabel={setLabel}
-          color={color}
-          setColor={setColor}
-          connected={connected}
-          selectedDateRange={selectedDateRange}
-          handleAddTimeslot={handleAddTimeslot}
-        />
-
-        <UpdateDeleteTimeslotPanel
-          timeslotId={timeslotId}
-          setTimeslotId={setTimeslotId}
-          connected={connected}
-          selectedDateRange={selectedDateRange}
-          handleUpdateTimeslot={handleUpdateTimeslot}
-          handleDeleteTimeslot={handleDeleteTimeslot}
-        />
-      </div>
-
-      <EventLogPanel eventLog={eventLog} eventLogRef={setEventLogRef} />
     </div>
   );
 }
