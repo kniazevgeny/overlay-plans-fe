@@ -92,7 +92,7 @@ const isEventEndDate = (event: CalendarEvent, date: Date): boolean => {
 const RangeCalendar = <T extends DateValue>({
   errorMessage,
   className,
-  visibleDuration = { months: 3 },
+  visibleDuration = { months: 2 },
   renderCellContent,
   events = [],
   onEventDragEnd,
