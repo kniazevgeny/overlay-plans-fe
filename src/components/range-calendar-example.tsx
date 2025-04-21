@@ -1,4 +1,4 @@
-import { useState, useEffect } from "preact/hooks";
+import { useState, useEffect, useMemo } from "preact/hooks";
 import { getLocalTimeZone, today, CalendarDate } from "@internationalized/date";
 import { RangeCalendar, CalendarEvent } from "./ui/range-calendar";
 import { WebSocketService } from "../utils/websocket-service";
@@ -103,6 +103,7 @@ export function RangeCalendarExample({
       );
 
       // Convert server timeslots to calendar events
+      const userIdNum = parseInt(userId) || 1;
       const calendarEvents: CalendarEvent[] = timeslots
         .filter((timeslot: any) => {
           // Ensure we have the required fields
@@ -123,6 +124,15 @@ export function RangeCalendarExample({
           const defaultColor =
             timeslot.status === "busy" ? "#ff5722" : "#4CAF50";
 
+          // Extract user information for avatar (if available)
+          const userId = timeslot.userId || userIdNum;
+          const userFirstName =
+            timeslot.userFirstName || timeslot.user?.firstName || "";
+          const userLastName =
+            timeslot.userLastName || timeslot.user?.lastName || "";
+          const userPhotoUrl =
+            timeslot.userPhotoUrl || timeslot.user?.photoUrl || "";
+
           // Convert to the expected CalendarEvent format
           const event: CalendarEvent = {
             id: timeslot.id ? timeslot.id.toString() : `temp-${Date.now()}`,
@@ -130,6 +140,13 @@ export function RangeCalendarExample({
             startDate: new Date(timeslot.startTime),
             endDate: new Date(timeslot.endTime),
             color: timeslot.color || defaultColor,
+            // Add user data for avatar display
+            userId,
+            userFirstName,
+            userLastName,
+            userPhotoUrl,
+            // Store the status for filtering busy events
+            status: timeslot.status === "busy" ? "busy" : "available"
           };
 
           return event;
@@ -234,7 +251,7 @@ export function RangeCalendarExample({
       userIdNum,
       { start: newStartDate, end: newEndDate },
       "", // notes
-      "active" // status
+      event.status === "busy" ? "busy" : "available" // status
     );
 
     // Fetch updated events after a short delay to ensure the update has processed
@@ -257,6 +274,11 @@ export function RangeCalendarExample({
         startDate: new Date(2025, 3, 15), // April 15, 2025
         endDate: new Date(2025, 3, 18), // April 18, 2025
         color: "#4b99d2",
+        // Add mock user data
+        userId: "101",
+        userFirstName: "Alex",
+        userLastName: "Smith",
+        status: "active"
       },
       {
         id: "mock-2",
@@ -264,6 +286,34 @@ export function RangeCalendarExample({
         startDate: new Date(2025, 4, 5), // May 5, 2025
         endDate: new Date(2025, 4, 5), // May 5, 2025
         color: "#e7ba51",
+        // Add mock user data
+        userId: "102",
+        userFirstName: "Taylor",
+        userPhotoUrl: "https://i.pravatar.cc/150?u=102",
+        status: "active"
+      },
+      {
+        id: "mock-3",
+        title: "Demo Meeting",
+        startDate: new Date(2025, 4, 12), // May 12, 2025
+        endDate: new Date(2025, 4, 13), // May 13, 2025
+        color: "#9c27b0",
+        // Add mock user data with no photo (will use initials)
+        userId: "103",
+        userFirstName: "Jamie",
+        userLastName: "Johnson",
+        status: "active"
+      },
+      {
+        id: "mock-4",
+        title: "Busy - Unavailable",
+        startDate: new Date(2025, 4, 20), // May 20, 2025
+        endDate: new Date(2025, 4, 22), // May 22, 2025
+        color: "#ff5722",
+        userId: "101",
+        userFirstName: "Alex",
+        userLastName: "Smith",
+        status: "busy"
       },
     ];
     setEvents(mockEvents);
@@ -282,6 +332,36 @@ export function RangeCalendarExample({
       webSocketService.getUserTimeslots(userIdNum, projectIdNum);
     }
   };
+
+  // Create disabled ranges from busy events
+  const disabledRanges = useMemo(() => {
+    // Filter events that have a "busy" status and create CalendarDate intervals
+    return events
+      .filter(event => event.status === "busy")
+      .map(event => {
+        // Create a start date with time set to 00:00:00
+        const startDate = new Date(event.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        
+        // Create an end date with time set to 23:59:59
+        const endDate = new Date(event.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        
+        // Convert to CalendarDate objects for the isDateUnavailable function
+        return [
+          new CalendarDate(
+            startDate.getFullYear(),
+            startDate.getMonth() + 1,
+            startDate.getDate()
+          ),
+          new CalendarDate(
+            endDate.getFullYear(),
+            endDate.getMonth() + 1,
+            endDate.getDate()
+          )
+        ] as [CalendarDate, CalendarDate];
+      });
+  }, [events]);
 
   return (
     <div className="w-full mx-auto p-4">
@@ -324,7 +404,7 @@ export function RangeCalendarExample({
           Calendar view set to April-May 2025 (where most events are located)
         </div>
 
-        {events.length === 0 && connected && (
+        {events.length === 0 &&  (
           <div className="mt-2">
             <button
               onClick={addMockEvents}
@@ -336,14 +416,19 @@ export function RangeCalendarExample({
         )}
       </div>
 
-      <div className="border rounded-lg p-4 bg-white shadow">
-        <RangeCalendar
-          value={value}
-          onChange={setValue}
-          events={events}
-          onEventDragEnd={handleEventDragEnd}
-        />
-      </div>
+      <RangeCalendar
+        value={value}
+        onChange={setValue}
+        events={events}
+        onEventDragEnd={handleEventDragEnd}
+        minValue={today(getLocalTimeZone())}
+        isDateUnavailable={(date) =>
+          disabledRanges.some(
+            (interval) =>
+              date.compare(interval[0]) >= 0 && date.compare(interval[1]) <= 0
+          )
+        }
+      />
 
       {rawData && (
         <div className="mt-4 p-4 bg-gray-100 rounded-lg">
@@ -364,6 +449,59 @@ export function RangeCalendarExample({
             Debug Information
           </summary>
           <pre className="mt-2 text-xs overflow-auto max-h-40">{debugInfo}</pre>
+        </details>
+      </div>
+
+      {disabledRanges.length > 0 && (
+        <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+          <details>
+            <summary className="text-sm font-medium cursor-pointer">
+              Busy/Unavailable Dates
+            </summary>
+            <div className="mt-2 text-xs">
+              <div className="font-medium mb-1">
+                {disabledRanges.length} busy period(s) marked as unavailable:
+              </div>
+              <ul className="list-disc pl-5">
+                {disabledRanges.map((range, index) => {
+                  // Find the corresponding event for this range
+                  const busyEvent = events.find(
+                    event => 
+                      event.status === "busy" && 
+                      new Date(event.startDate).getDate() === range[0].day &&
+                      new Date(event.startDate).getMonth() + 1 === range[0].month &&
+                      new Date(event.endDate).getDate() === range[1].day &&
+                      new Date(event.endDate).getMonth() + 1 === range[1].month
+                  );
+                  
+                  return (
+                    <li key={index}>
+                      {range[0].month}/{range[0].day}/{range[0].year} to{" "}
+                      {range[1].month}/{range[1].day}/{range[1].year}
+                      {busyEvent && (
+                        <span className="ml-2 text-gray-500">
+                          ({busyEvent.title})
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </details>
+        </div>
+      )}
+
+      <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+        <details>
+          <summary className="text-sm font-medium cursor-pointer">
+            Event Statistics
+          </summary>
+          <div className="mt-2 text-xs">
+            <p>Total events: {events.length}</p>
+            <p>Visible events: {events.filter(e => e.status !== "busy").length}</p>
+            <p>Hidden busy events: {events.filter(e => e.status === "busy").length}</p>
+          </div>
         </details>
       </div>
     </div>

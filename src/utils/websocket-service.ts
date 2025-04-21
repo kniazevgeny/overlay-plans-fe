@@ -88,19 +88,19 @@ export class WebSocketService {
 
   /**
    * Get user timeslots
-   * @param userId - User ID
+   * @param telegramId - Telegram ID
    * @param projectId - Project ID
    */
-  getUserTimeslots(userId: number, projectId: number): void {
+  getUserTimeslots(telegramId: number, projectId: number): void {
     if (!this.socket) return;
 
     this.setEventLog((prev) =>
-      this.logEvent(prev, "Getting timeslots", { userId, projectId })
+      this.logEvent(prev, "Getting timeslots", { telegramId, projectId })
     );
 
     this.socket.emit(
       "get_user_timeslots",
-      { userId, projectId },
+      { telegramId, projectId },
       (response: any) => {
         // Log a summary instead of the full response
         const responseSize = response
@@ -256,7 +256,7 @@ export class WebSocketService {
 
     const updateData = {
       projectId,
-      requestUserId: userId,
+      requestUserTelegramId: userId,
       timeslots: [
         {
           id: timeslotId,
