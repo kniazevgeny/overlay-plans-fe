@@ -1,6 +1,5 @@
 import { useState } from "preact/hooks";
 import { getLocalTimeZone, today } from "@internationalized/date";
-import { DateValue } from "react-aria-components";
 import { RangeCalendar } from "../components/ui/range-calendar";
 import { Button } from "../components/ui/button";
 import { DateRange } from "../utils/date-range";

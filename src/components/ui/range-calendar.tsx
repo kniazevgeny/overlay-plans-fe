@@ -720,38 +720,13 @@ const RangeCalendar = <T extends DateValue>({
 
   // Define the memoized component properly
   const EventIndicatorsComponent = React.memo(
-    ({
-      date,
-      events,
-      dragInfo,
-    }: {
-      date: Date;
-      events: CalendarEvent[];
-      dragInfo?: { currentDate: Date; startDate: Date; isDragging: boolean };
-    }) => {
+    ({ date }: { date: Date }) => {
       // Use the existing renderEvents function
       return renderEvents(date);
     },
     (prevProps, nextProps) => {
-      // Custom comparison function to determine if we need to re-render
-      // Only re-render if the drag state changes for this date or events change
-      const sameDate = isSameDay(prevProps.date, nextProps.date);
-      const sameEvents = prevProps.events === nextProps.events;
-
-      // Drag info comparison
-      let sameDragInfo = false;
-      if (!prevProps.dragInfo && !nextProps.dragInfo) {
-        sameDragInfo = true;
-      } else if (prevProps.dragInfo && nextProps.dragInfo) {
-        sameDragInfo = isSameDay(
-          prevProps.dragInfo.currentDate,
-          nextProps.dragInfo.currentDate
-        );
-      } else {
-        sameDragInfo = false; // One has drag info, the other doesn't
-      }
-
-      return sameDate && sameEvents && sameDragInfo;
+      // Only re-render if the date changes
+      return isSameDay(prevProps.date, nextProps.date);
     }
   );
 
@@ -890,7 +865,7 @@ const RangeCalendar = <T extends DateValue>({
     };
 
     // Handle drag end (occurs whether drop happened or not)
-    const handleDragEnd = (e: DragEvent) => {
+    const handleDragEnd = () => {
       debugLog("Drag ended");
 
       // Clean up drag state
@@ -1015,7 +990,7 @@ const RangeCalendar = <T extends DateValue>({
     <>
       <RangeCalendarPrimitive visibleDuration={visibleDuration} {...props}>
         <CalendarHeader isRange />
-        <div className="flex snap-x items-start justify-stretch gap-6 overflow-auto sm:gap-10 pb-12">
+        <div className="range-cal__table flex snap-x items-start justify-stretch gap-6 overflow-auto sm:gap-10 pb-12">
           {Array.from({ length: visibleDuration?.months ?? 1 }).map(
             (_, index) => {
               const id = index + 1;
@@ -1033,7 +1008,7 @@ const RangeCalendar = <T extends DateValue>({
                         className={twMerge([
                           "shrink-0 [--cell-fg:var(--color-primary)] [--cell:color-mix(in_oklab,var(--color-primary)_15%,white_85%)]",
                           "dark:[--cell-fg:color-mix(in_oklab,var(--color-primary)_80%,white_20%)] dark:[--cell:color-mix(in_oklab,var(--color-primary)_30%,black_45%)]",
-                          "group relative size-22 cursor-default outline-hidden [line-height:2.286rem] sm:size-20 sm:text-sm",
+                          "group relative size-14 sm:size-22 cursor-default outline-hidden [line-height:2.286rem] sm:text-sm",
                           "[td:first-child_&]:rounded-s-lg [td:last-child_&]:rounded-e-lg",
                           // Style for unavailable dates
                           "[&[data-unavailable]]:text-[var(--danger)] [&[data-unavailable]]:line-through",
@@ -1072,11 +1047,7 @@ const RangeCalendar = <T extends DateValue>({
                         }) => (
                           <span className="w-full h-full flex flex-col">
                             {/* Event indicators */}
-                            <EventIndicatorsComponent
-                              date={toJSDate(date)}
-                              events={adjustedEvents}
-                              dragInfo={draggedEventRef.current?._dragData}
-                            />
+                            <EventIndicatorsComponent date={toJSDate(date)} />
 
                             {/* Date content */}
                             {(() => {
@@ -1087,8 +1058,6 @@ const RangeCalendar = <T extends DateValue>({
                                 jsDate,
                                 events
                               );
-                              const hasBusyEvents = busyEvents.length > 0;
-
                               // Format the date content
                               const dateContent = (
                                 <span

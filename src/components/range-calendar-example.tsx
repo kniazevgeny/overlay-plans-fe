@@ -364,7 +364,7 @@ export function RangeCalendarExample({
   }, [events]);
 
   return (
-    <div className="w-full mx-auto p-4">
+    <div className="w-full mx-auto py-4">
       <h1 className="text-2xl font-bold mb-4">Real-time Calendar Events</h1>
       <div className="mb-4">
         <div className="flex items-center justify-between">

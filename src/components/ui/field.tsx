@@ -38,13 +38,14 @@ const fieldStyles = tv({
 
 const { description, label, fieldError } = fieldStyles()
 
-const Label = ({ className, ...props }: LabelProps) => {
+const Label = ({ className, ...props }: LabelProps & { className?: string }) => {
   return <LabelPrimitive {...props} className={label({ className })} />
 }
 
 interface DescriptionProps extends TextProps {
   isWarning?: boolean
   ref?: React.RefObject<HTMLElement>
+  className?: string
 }
 
 const Description = ({ ref, className, ...props }: DescriptionProps) => {

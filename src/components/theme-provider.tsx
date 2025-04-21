@@ -1,4 +1,4 @@
-import * as React from 'react'
+import * as React from 'preact/compat'
 
 type Theme = 'dark' | 'light' | 'system'
 
