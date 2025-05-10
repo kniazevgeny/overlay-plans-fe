@@ -27,3 +27,19 @@
     flex-direction: column;
   }
 }
+
+/* Hide entire first row of month if it contains days from previous/next month */
+tbody tr:first-child:has(td:first-child > div[data-day-of-month="26"]),
+tbody tr:first-child:has(td:first-child > div[data-day-of-month="27"]),
+tbody tr:first-child:has(td:first-child > div[data-day-of-month="28"]),
+tbody tr:first-child:has(td:first-child > div[data-day-of-month="29"]),
+tbody tr:first-child:has(td:first-child > div[data-day-of-month="30"]),
+tbody tr:first-child:has(td:first-child > div[data-day-of-month="31"]),
+tbody tr:first-child:has(td:last-child > div[data-day-of-month="1"]),
+tbody tr:first-child:has(td:last-child > div[data-day-of-month="2"]),
+tbody tr:first-child:has(td:last-child > div[data-day-of-month="3"]),
+tbody tr:first-child:has(td:last-child > div[data-day-of-month="4"]),
+tbody tr:first-child:has(td:last-child > div[data-day-of-month="5"]),
+tbody tr:first-child:has(td:last-child > div[data-day-of-month="6"]) {
+  display: none;
+}
