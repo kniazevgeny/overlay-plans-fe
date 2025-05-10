@@ -179,7 +179,7 @@ const RangeCalendar = <T extends DateValue>({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside, { passive: false });
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
@@ -554,9 +554,9 @@ const RangeCalendar = <T extends DateValue>({
       }
     };
 
-    // Add document-level event listeners
-    document.addEventListener('touchmove', touchMoveHandler.current, { passive: false });
-    document.addEventListener('touchend', touchEndHandler.current, { passive: false });
+    // Add document-level event listeners with passive option where possible
+    document.addEventListener('touchmove', touchMoveHandler.current, { passive: false }); // Cannot be passive as we need preventDefault
+    document.addEventListener('touchend', touchEndHandler.current, { passive: true });
   }, []);
 
   const handleTouchMove = useCallback((e: TouchEvent | JSX.TargetedTouchEvent<HTMLDivElement>) => {
@@ -572,14 +572,26 @@ const RangeCalendar = <T extends DateValue>({
       const deltaY = Math.abs(coords.y - touchStartY);
       if (deltaX > moveThreshold || deltaY > moveThreshold) {
         setIsTouchDragging(true);
-        // Only prevent default after we confirm we're dragging
-        e.preventDefault();
+        // Only try to prevent default if this is a direct event on our element
+        if ('target' in e && e.target instanceof HTMLElement && e.target.closest('[data-event-id]')) {
+          try {
+            e.preventDefault();
+          } catch (err) {
+            // Ignore if we can't prevent default due to passive listener
+          }
+        }
       } else {
         return;
       }
     } else {
-      // Always prevent default when actively dragging
-      e.preventDefault();
+      // Only try to prevent default if this is a direct event on our element
+      if ('target' in e && e.target instanceof HTMLElement && e.target.closest('[data-event-id]')) {
+        try {
+          e.preventDefault();
+        } catch (err) {
+          // Ignore if we can't prevent default due to passive listener
+        }
+      }
     }
 
     const date = extractDateFromEvent(e);
@@ -600,8 +612,14 @@ const RangeCalendar = <T extends DateValue>({
       return;
     }
 
-    // Only prevent default if we were actually dragging
-    e.preventDefault();
+    // Only try to prevent default if we were actually dragging
+    if ('target' in e && e.target instanceof HTMLElement && e.target.closest('[data-event-id]')) {
+      try {
+        e.preventDefault();
+      } catch (err) {
+        // Ignore if we can't prevent default due to passive listener
+      }
+    }
 
     const dragData = draggedEventRef.current._dragData;
     if (!dragData) {
@@ -767,7 +785,11 @@ const RangeCalendar = <T extends DateValue>({
                   if (date) setDragCurrentDate(date);
                 }
               }}
-              onTouchStart={(e) => handleTouchStart(event, date, e)}
+              onTouchStart={(e) => {
+                // Add passive option to the event listener
+                e.currentTarget.addEventListener('touchstart', () => handleTouchStart(event, date, e), { passive: true, once: true });
+                handleTouchStart(event, date, e);
+              }}
               onClick={(e) => {
                 e.stopPropagation();
                 setSelectedEventId(event.id);
