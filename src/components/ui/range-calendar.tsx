@@ -158,40 +158,62 @@ const RangeCalendar = <T extends DateValue>({
 
   const cellRefs = useRef<HTMLTableCellElement[]>([]);
 
-  // Helper to extract date from DOM element with performance optimization
-  const extractDateFromEvent = useCallback((e: DragEvent): Date | null => {
-    // Performance optimization: Use cached element when possible
-    if (e.target) {
-      const target = e.target as HTMLElement;
-      // Direct attribute check first (fastest path)
-      const dateAttr = target.getAttribute("data-date");
-      if (dateAttr) {
-        try {
-          return new Date(dateAttr);
-        } catch (err) {
-          // Silent fail and continue to fallbacks
-        }
-      }
-    }
+  // Add state for selected event
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
-    // Only use elementFromPoint as a fallback (expensive operation)
-    const x = e.clientX;
-    const y = e.clientY;
-    const elementFromPoint = document.elementFromPoint(x, y);
+  // Add touch handling state
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const [isTouchDragging, setIsTouchDragging] = useState(false);
+
+  // Add refs for touch event cleanup
+  const touchMoveHandler = useRef<((e: TouchEvent) => void) | null>(null);
+  const touchEndHandler = useRef<((e: TouchEvent) => void) | null>(null);
+
+  // Add click outside handler
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-event-id]')) {
+        setSelectedEventId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Helper to extract coordinates from either mouse or touch event
+  const getEventCoordinates = (e: MouseEvent | TouchEvent): { x: number, y: number } | null => {
+    if ('touches' in e) {
+      // Touch event
+      const touch = e.touches[0] || e.changedTouches[0];
+      return touch ? { x: touch.clientX, y: touch.clientY } : null;
+    } else {
+      // Mouse event
+      return { x: e.clientX, y: e.clientY };
+    }
+  };
+
+  // Modify extractDateFromEvent to work with both mouse and touch events
+  const extractDateFromEvent = useCallback((e: MouseEvent | TouchEvent | DragEvent): Date | null => {
+    const coords = getEventCoordinates(e);
+    if (!coords) return null;
+
+    const elementFromPoint = document.elementFromPoint(coords.x, coords.y);
     if (elementFromPoint) {
       const cellWithDate = elementFromPoint.closest("[data-date]");
       if (cellWithDate) {
-        const pointDateAttr = cellWithDate.getAttribute("data-date");
-        if (pointDateAttr) {
+        const dateAttr = cellWithDate.getAttribute("data-date");
+        if (dateAttr) {
           try {
-            return new Date(pointDateAttr);
+            return new Date(dateAttr);
           } catch (err) {
-            debugLog("Error parsing date from point:", pointDateAttr, err);
+            debugLog("Error parsing date from point:", dateAttr, err);
           }
         }
       }
     }
-
     return null;
   }, []);
 
@@ -484,6 +506,158 @@ const RangeCalendar = <T extends DateValue>({
     [handleDocDragEnd]
   );
 
+  // Modify the touch event handlers to be more performant
+  const handleTouchStart = useCallback((event: CalendarEvent, date: Date, e: TouchEvent | JSX.TargetedTouchEvent<HTMLDivElement>) => {
+    const coords = getEventCoordinates(e);
+    if (!coords) return;
+
+    setTouchStartX(coords.x);
+    setTouchStartY(coords.y);
+    setIsTouchDragging(false);
+
+    // Store initial drag data
+    draggedEventRef.current = {
+      ...event,
+      _dragData: {
+        startDate: date,
+        currentDate: date,
+        isDragging: true,
+      },
+    };
+
+    setDraggedEventId(event.id);
+    setDragStartDate(date);
+    setDragCurrentDate(date);
+
+    // Clean up any existing handlers
+    if (touchMoveHandler.current) {
+      document.removeEventListener('touchmove', touchMoveHandler.current);
+    }
+    if (touchEndHandler.current) {
+      document.removeEventListener('touchend', touchEndHandler.current);
+    }
+
+    // Create new handlers
+    touchMoveHandler.current = (moveEvent: TouchEvent) => {
+      handleTouchMove(moveEvent);
+    };
+    touchEndHandler.current = (endEvent: TouchEvent) => {
+      handleTouchEnd(endEvent);
+      // Clean up handlers after touch end
+      if (touchMoveHandler.current) {
+        document.removeEventListener('touchmove', touchMoveHandler.current);
+        touchMoveHandler.current = null;
+      }
+      if (touchEndHandler.current) {
+        document.removeEventListener('touchend', touchEndHandler.current);
+        touchEndHandler.current = null;
+      }
+    };
+
+    // Add document-level event listeners
+    document.addEventListener('touchmove', touchMoveHandler.current, { passive: false });
+    document.addEventListener('touchend', touchEndHandler.current, { passive: false });
+  }, []);
+
+  const handleTouchMove = useCallback((e: TouchEvent | JSX.TargetedTouchEvent<HTMLDivElement>) => {
+    if (!draggedEventRef.current || !touchStartX || !touchStartY) return;
+
+    const coords = getEventCoordinates(e);
+    if (!coords) return;
+
+    // Set dragging after a small threshold to differentiate from taps
+    const moveThreshold = 10;
+    if (!isTouchDragging) {
+      const deltaX = Math.abs(coords.x - touchStartX);
+      const deltaY = Math.abs(coords.y - touchStartY);
+      if (deltaX > moveThreshold || deltaY > moveThreshold) {
+        setIsTouchDragging(true);
+        // Only prevent default after we confirm we're dragging
+        e.preventDefault();
+      } else {
+        return;
+      }
+    } else {
+      // Always prevent default when actively dragging
+      e.preventDefault();
+    }
+
+    const date = extractDateFromEvent(e);
+    if (date) {
+      if (draggedEventRef.current?._dragData) {
+        draggedEventRef.current._dragData.currentDate = date;
+      }
+      throttledSetDragCurrentDate(date);
+    }
+  }, [touchStartX, touchStartY, isTouchDragging, extractDateFromEvent, throttledSetDragCurrentDate]);
+
+  const handleTouchEnd = useCallback((e: TouchEvent | JSX.TargetedTouchEvent<HTMLDivElement>) => {
+    if (!draggedEventRef.current || !isTouchDragging) {
+      resetDragState();
+      setTouchStartX(null);
+      setTouchStartY(null);
+      setIsTouchDragging(false);
+      return;
+    }
+
+    // Only prevent default if we were actually dragging
+    e.preventDefault();
+
+    const dragData = draggedEventRef.current._dragData;
+    if (!dragData) {
+      resetDragState();
+      return;
+    }
+
+    const coords = getEventCoordinates(e);
+    if (!coords) {
+      resetDragState();
+      return;
+    }
+
+    const finalDate = extractDateFromEvent(e) || dragData.currentDate;
+    if (!finalDate) {
+      resetDragState();
+      return;
+    }
+
+    const daysDiff = Math.round(
+      (finalDate.getTime() - dragData.startDate.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    if (daysDiff !== 0 && onEventDragEnd) {
+      const newStartDate = new Date(draggedEventRef.current.startDate);
+      newStartDate.setDate(newStartDate.getDate() + daysDiff);
+
+      const newEndDate = new Date(draggedEventRef.current.endDate);
+      newEndDate.setDate(newEndDate.getDate() + daysDiff);
+
+      const eventToUpdate = { ...draggedEventRef.current };
+      delete eventToUpdate._dragData;
+
+      onEventDragEnd(eventToUpdate, newStartDate, newEndDate);
+    }
+
+    resetDragState();
+    setTouchStartX(null);
+    setTouchStartY(null);
+    setIsTouchDragging(false);
+  }, [isTouchDragging, extractDateFromEvent, onEventDragEnd, resetDragState]);
+
+  // Clean up touch handlers on unmount
+  useEffect(() => {
+    return () => {
+      if (touchMoveHandler.current) {
+        document.removeEventListener('touchmove', touchMoveHandler.current);
+        touchMoveHandler.current = null;
+      }
+      if (touchEndHandler.current) {
+        document.removeEventListener('touchend', touchEndHandler.current);
+        touchEndHandler.current = null;
+      }
+    };
+  }, []);
+
   // Render event indicators for a specific date
   const renderEvents = (date: Date) => {
     // Filter out busy events and use the memoized adjusted events
@@ -496,17 +670,14 @@ const RangeCalendar = <T extends DateValue>({
     // Create a map of event IDs to their position index to ensure consistent positioning
     // This will determine the grid row for each event
     const eventPositionMap = useMemo(() => {
-      // Create a list of all unique events, excluding busy events
-      const uniqueEvents = [
-        ...new Map(
-          events
-            .filter((event) => event.status !== "busy") // Filter out busy events
-            .map((event) => [event.id, event])
-        ).values(),
-      ];
+      // If there's only one event on this date, it should always be at position 1
+      if (eventsOnDate.length === 1) {
+        return new Map([[eventsOnDate[0].id, 1]]);
+      }
 
+      // For multiple events, we'll create positions based only on the events for this date
       // Sort by duration (longer events first)
-      const sortedEvents = uniqueEvents.sort((a, b) => {
+      const sortedEvents = [...eventsOnDate].sort((a, b) => {
         const durationA =
           Math.round(
             (a.endDate.getTime() - a.startDate.getTime()) /
@@ -520,9 +691,9 @@ const RangeCalendar = <T extends DateValue>({
         return durationB - durationA;
       });
 
-      // Map each event ID to its position index
-      return new Map(sortedEvents.map((event, index) => [event.id, index + 1])); // Grid rows start at 1
-    }, [events]);
+      // Map each event ID to its position index, starting from 1
+      return new Map(sortedEvents.map((event, index) => [event.id, index + 1]));
+    }, [eventsOnDate]); // Only depend on events for this specific date
 
     // Identify if we're dealing with a drag operation into this date
     const isDraggedDate =
@@ -553,7 +724,7 @@ const RangeCalendar = <T extends DateValue>({
           zIndex: isDraggedDate
             ? 100
             : eventsOnDate.some((e) => isEventStartDate(e, date))
-            ? 40
+            ? eventsOnDate.some((e) => e.id === selectedEventId) ? 41 : 40
             : 20,
         }}
       >
@@ -561,16 +732,6 @@ const RangeCalendar = <T extends DateValue>({
           const isStart = isEventStartDate(event, date);
           const isEnd = isEventEndDate(event, date);
           const isDragged = draggedEventId === event.id;
-
-          // Days duration of the event
-          const eventDuration =
-            Math.round(
-              (event.endDate.getTime() - event.startDate.getTime()) /
-                (1000 * 60 * 60 * 24)
-            ) + 1;
-
-          // Determine the height of the event indicator
-          const heightPx = eventDuration <= 3 ? 20 : 20;
 
           // Get the grid row position for this event
           const gridRow = eventPositionMap.get(event.id) || 1;
@@ -584,13 +745,13 @@ const RangeCalendar = <T extends DateValue>({
           return (
             <div
               key={event.id}
+              data-event-id={event.id}
               draggable={true}
               onDragStart={(e: JSX.TargetedDragEvent<HTMLDivElement>) =>
                 handleDragStart(event, date, e)
               }
               onDragEnd={handleDragEnd}
               onDragOver={(e) => {
-                // Ensure drag over works even on the event itself
                 e.preventDefault();
                 e.stopPropagation();
                 if (draggedEventId) {
@@ -598,30 +759,56 @@ const RangeCalendar = <T extends DateValue>({
                   if (date) setDragCurrentDate(date);
                 }
               }}
+              onTouchMove={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (draggedEventId) {
+                  const date = extractDateFromEvent(e);
+                  if (date) setDragCurrentDate(date);
+                }
+              }}
+              onTouchStart={(e) => handleTouchStart(event, date, e)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedEventId(event.id);
+              }}
               className={twMerge(
-                "cursor-move flex items-center overflow-visible relative",
+                "cursor-move flex items-center overflow-visible relative group touch-none",
                 isStart ? "rounded-l-full ml-0.5" : "",
                 isEnd ? "rounded-r-full mr-0.5" : "",
                 isStart && isEnd ? "rounded-full mx-0.5" : "",
-                "transition-all duration-100",
-                isDragged ? "opacity-90 shadow-lg" : "hover:opacity-90"
+                "transition-all duration-200",
+                (isDragged || isTouchDragging) ? "opacity-90 shadow-lg" : "hover:opacity-90",
+                selectedEventId === event.id && "z-10"
               )}
               style={{
                 backgroundColor: event.color || "var(--color-primary)",
-                zIndex: isDragged ? 2 : 1,
-                height: `${heightPx}px`,
+                zIndex: (isDragged || isTouchDragging) ? 2 : selectedEventId === event.id ? 3 : 1,
+                minHeight: selectedEventId === event.id || isDragged || isTouchDragging ? "20px" : "10px",
                 gridRow: actualGridRow,
+                transform: isTouchDragging ? 'scale(1.05)' : undefined, // Subtle feedback for touch drag
+                touchAction: 'none', // Prevent browser touch actions
               }}
               title={`${
                 event.title
               } (${event.startDate.toLocaleDateString()} - ${event.endDate.toLocaleDateString()})`}
             >
               {isStart && (
-                <span className="text-white text-xs font-semibold whitespace-nowrap pl-2 pr-1 drop-shadow-sm flex items-center gap-1 pointer-events-none">
-                  {/* Avatar component */}
+                <span 
+                  className={twMerge(
+                    "text-white text-[8px] font-semibold whitespace-nowrap pl-2 pr-1 drop-shadow-sm flex items-center gap-1 pointer-events-none transition-all duration-200",
+                    selectedEventId === event.id && "text-[10px]",
+                    selectedEventId !== event.id && "opacity-0"
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedEventId(event.id);
+                  }}
+                >
                   {(event.userPhotoUrl ||
                     event.userFirstName ||
-                    event.userLastName) && (
+                    event.userLastName) && 
+                    selectedEventId === event.id && (
                     <Avatar
                       src={event.userPhotoUrl}
                       initials={getInitials(
@@ -632,7 +819,7 @@ const RangeCalendar = <T extends DateValue>({
                       className="flex-shrink-0"
                     />
                   )}
-                  <span className="truncate max-w-[100px]">{event.title}</span>
+                  <span className="truncate max-w-[100px] leading-none">{event.title}</span>
                 </span>
               )}
             </div>
@@ -990,7 +1177,7 @@ const RangeCalendar = <T extends DateValue>({
     <>
       <RangeCalendarPrimitive visibleDuration={visibleDuration} {...props}>
         <CalendarHeader isRange />
-        <div className="range-cal__table flex snap-x items-start justify-stretch gap-6 overflow-auto sm:gap-10 pb-12">
+        <div className="range-cal__table flex snap-x items-start justify-stretch gap-n5 overflow-auto sm:gap-10 pb-12">
           {Array.from({ length: visibleDuration?.months ?? 1 }).map(
             (_, index) => {
               const id = index + 1;
@@ -998,7 +1185,9 @@ const RangeCalendar = <T extends DateValue>({
                 <CalendarGrid
                   key={index}
                   offset={id >= 2 ? { months: id - 1 } : undefined}
-                  className="[&_td]:border-collapse [&_td]:px-0 [&_td]:py-0.5"
+                  className={`[&_td]:border-collapse [&_td]:px-0 [&_td]:py-0.5 ${
+                    index === 1 ? "[&_thead]:hidden" : ""
+                  }`}
                 >
                   <CalendarGridHeader />
                   <CalendarGridBody className="snap-start">
@@ -1008,7 +1197,7 @@ const RangeCalendar = <T extends DateValue>({
                         className={twMerge([
                           "shrink-0 [--cell-fg:var(--color-primary)] [--cell:color-mix(in_oklab,var(--color-primary)_15%,white_85%)]",
                           "dark:[--cell-fg:color-mix(in_oklab,var(--color-primary)_80%,white_20%)] dark:[--cell:color-mix(in_oklab,var(--color-primary)_30%,black_45%)]",
-                          "group relative size-14 sm:size-22 cursor-default outline-hidden [line-height:2.286rem] sm:text-sm",
+                          "group relative size-12 h-[70px] sm:size-22 cursor-default outline-hidden [line-height:2.286rem] sm:text-sm",
                           "[td:first-child_&]:rounded-s-lg [td:last-child_&]:rounded-e-lg",
                           // Style for unavailable dates
                           "[&[data-unavailable]]:text-[var(--danger)] [&[data-unavailable]]:line-through",
@@ -1017,6 +1206,7 @@ const RangeCalendar = <T extends DateValue>({
                           draggedEventId ? "cursor-move" : "cursor-default", // Change cursor when dragging
                         ])}
                         data-date={toJSDate(date).toISOString()}
+                        data-day-of-month={toJSDate(date).getDate()}
                         ref={(el: HTMLTableCellElement) => {
                           if (el) {
                             // Optimize cell refs storage to prevent memory issues
