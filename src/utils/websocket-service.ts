@@ -34,7 +34,11 @@ export class WebSocketService {
     }
 
     try {
-      this.socket = io(serverUrl);
+      this.socket = io(serverUrl, {
+        extraHeaders: {
+          "ngrok-skip-browser-warning": "69420",
+        },
+      });
 
       this.socket.on("connect", () => {
         this.setConnected(true);
