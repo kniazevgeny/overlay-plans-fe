@@ -271,10 +271,9 @@ export function RangeCalendarExample({
       {
         id: "mock-1",
         title: "Mock Event 1",
-        startDate: new Date(2025, 3, 15), // April 15, 2025
-        endDate: new Date(2025, 3, 18), // April 18, 2025
+        startDate: new Date(2025, 11, 5), // December 5, 2025
+        endDate: new Date(2025, 11, 7), // December 7, 2025
         color: "#4b99d2",
-        // Add mock user data
         userId: "101",
         userFirstName: "Alex",
         userLastName: "Smith",
@@ -283,10 +282,9 @@ export function RangeCalendarExample({
       {
         id: "mock-2",
         title: "Mock Event 2",
-        startDate: new Date(2025, 4, 5), // May 5, 2025
-        endDate: new Date(2025, 4, 5), // May 5, 2025
+        startDate: new Date(2025, 11, 10), // December 10, 2025
+        endDate: new Date(2025, 11, 10), // December 10, 2025
         color: "#e7ba51",
-        // Add mock user data
         userId: "102",
         userFirstName: "Taylor",
         userPhotoUrl: "https://i.pravatar.cc/150?u=102",
@@ -295,10 +293,9 @@ export function RangeCalendarExample({
       {
         id: "mock-3",
         title: "Demo Meeting",
-        startDate: new Date(2025, 4, 12), // May 12, 2025
-        endDate: new Date(2025, 4, 13), // May 13, 2025
+        startDate: new Date(2025, 11, 15), // December 15, 2025
+        endDate: new Date(2025, 11, 16), // December 16, 2025
         color: "#9c27b0",
-        // Add mock user data with no photo (will use initials)
         userId: "103",
         userFirstName: "Jamie",
         userLastName: "Johnson",
@@ -307,8 +304,8 @@ export function RangeCalendarExample({
       {
         id: "mock-4",
         title: "Busy - Unavailable",
-        startDate: new Date(2025, 4, 20), // May 20, 2025
-        endDate: new Date(2025, 4, 22), // May 22, 2025
+        startDate: new Date(2025, 11, 20), // December 20, 2025
+        endDate: new Date(2025, 11, 22), // December 22, 2025
         color: "#ff5722",
         userId: "101",
         userFirstName: "Alex",

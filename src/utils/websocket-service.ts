@@ -264,6 +264,7 @@ export class WebSocketService {
           endTime: endDateTime,
           notes: notes || undefined,
           status,
+          color: null
         },
       ],
     };
